@@ -1,0 +1,107 @@
+
+
+Get official MakeyMakey software from [[https://github.com/sparkfun/MaKeyMaKey/][github]].
+MakeyMakey [[https://www.sparkfun.com/tutorials/388][tutorial]]
+
+* Make arduino behave like a keyboard
+** Program the usb-chip
+   Upload *.hex file to the serial communicator chip.
+   The hex-files can be found [[http://hunt.net.nz/users/darran/weblog/b3029/Arduino_UNO_Keyboard_HID_version_03.html][here]].
+
+   avrdude -c avrispmkII -P usb -p usb162 -u -U flash:w:/path/to/hex -F
+
+   eg.
+   act like normal arduino
+   $ sudo avrdude -c avrispmkII -P usb -p usb162 -u -U flash:w:Arduino-usbserial-uno.hex -F
+
+   act like keyboard
+   $ sudo avrdude -c avrispmkII -P usb -p usb162 -u -U flash:w:Arduino-keyboard-0.3.hex -F
+
+   Follow the changes
+   $ tail -f /var/log/kern.log
+
+   Remember the Arduino need!!! to be powered while re-flashing. Eg. either connect the usb-stick or a external power connector.
+   Otherwise we'll get an error:
+   $ avrdude: initialization failed, rc=-1
+
+   The cable from AVRISP MKII(flashing devise) have to go into the board for the usb-chip and out of the board for the atmega chip.
+** Key-codes
+
+The keys are sent using Serial.write. The key codes is found from [[http://www.usb.org/developers/devclass_docs/Hut1_11.pdf][HID usage table]] p. 53.
+
+*** Small example sending 'keyboard volume up' key.
+#+begin_src c++
+uint8_t buf[8] = { 0 };
+buf[2] = 128; // volume up
+Serial.write(128,8) // send key press
+buf[2] = 0;
+Serial.write(buf, 8); // Release key
+#+end_src
+
+*** Larger example
+
+#+begin_src c++
+// Arduino USB Keyboard HID demo
+//
+// Sends Volume up, hello world, and Volume Down to the host PC
+//
+// From http://hunt.net.nz/users/darran/weblog/b3029/Arduino_UNO_Keyboard_HID_version_03.html
+
+uint8_t buf[8] = { 0 }; /* Keyboard report buffer */
+
+void setup();
+void loop();
+
+#define KEY_LEFT_CTRL   0x01
+#define KEY_LEFT_SHIFT  0x02
+#define KEY_RIGHT_CTRL  0x10
+#define KEY_RIGHT_SHIFT 0x20
+
+void setup()
+{
+    Serial.begin(9600);
+    delay(200);
+}
+
+char *str = "+hello world-";
+
+void loop()
+{
+    char *chp = str;
+    delay(5000);
+    while (*chp) {
+
+    if ((*chp >= 'a') && (*chp <= 'z')) {
+        buf[2] = *chp - 'a' + 4;
+    } else if ((*chp >= 'A') && (*chp <= 'Z')) {
+        buf[0] = KEY_LEFT_SHIFT;    /* Caps */
+        buf[2] = *chp - 'A' + 4;
+    } else {
+        switch (*chp) {
+        case ' ':
+            buf[2] = 0x2c;  // Space
+        break;
+        case '+':
+           buf[2] = 128;    // Volume up
+           break;
+        case '-':
+           buf[2] = 129;    // Volume down
+           break;
+        default:
+            /* Character not handled. To do: add rest of chars from HUT1_11.pdf */
+        buf[2] = 0x37;  // Period
+        break;
+        }
+    }
+
+    Serial.write(buf, 8);   // Send keypress
+    buf[0] = 0;
+    buf[2] = 0;
+    Serial.write(buf, 8);   // Release key
+    chp++;
+    }
+}
+#+end_src
+* Apps to use
+
+[[http://www.bgfl.org/custom/resources_ftp/client_ftp/ks2/music/piano/][Virtual keyboard]]
